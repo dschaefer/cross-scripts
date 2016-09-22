@@ -25,8 +25,6 @@ elif [ "$ARCH" = "win64" ]; then
 elif [ "$ARCH" = "macosx" ]; then
     BUILD=x86_64-apple-darwin14.4.0
     HOST=x86_64-apple-darwin14.4.0
-    export CC=gcc-5
-    export CXX=g++-5
 else
     echo Unknown arch: $ARCH
     exit
@@ -40,12 +38,17 @@ MPC_VERSION=mpc-1.0.3
 ISL_VERSION=isl-0.16.1
 GDB_VERSION=gdb-7.11.1
 
-INSTALL_PATH=$PWD/out-$ARCH
-export PATH=$INSTALL_PATH/bin:$PWD/out-$MAIN/bin:$PATH
+DOWNLOAD_DIR=$PWD/download
+SRC_DIR=$PWD/src
+BUILD_DIR=$PWD/build-$ARCH/$TARGET
+INSTALL_DIR=$PWD/out-$ARCH/$TARGET
+TAR_DIR=$PWD/tars
+
+export PATH=$INSTALL_DIR/bin:$PATH
 
 # Download packages
-mkdir -p download
-cd download
+mkdir -p $DOWNLOAD_DIR
+cd $DOWNLOAD_DIR
 wget -nc https://ftp.gnu.org/gnu/binutils/$BINUTILS_VERSION.tar.gz
 wget -nc https://ftp.gnu.org/gnu/gcc/$GCC_VERSION/$GCC_VERSION.tar.gz
 wget -nc https://ftp.gnu.org/gnu/mpfr/$MPFR_VERSION.tar.xz
@@ -53,22 +56,17 @@ wget -nc https://ftp.gnu.org/gnu/gmp/$GMP_VERSION.tar.xz
 wget -nc https://ftp.gnu.org/gnu/mpc/$MPC_VERSION.tar.gz
 wget -nc ftp://gcc.gnu.org/pub/gcc/infrastructure/$ISL_VERSION.tar.bz2
 wget -nc https://ftp.gnu.org/gnu/gdb/$GDB_VERSION.tar.xz
-cd ..
 
 # Extract everything
-mkdir -p src
-cd src
-[ -d $BINUTILS_VERSION ] || tar xf ../download/$BINUTILS_VERSION.tar.gz
-[ -d $GCC_VERSION ] || tar xf ../download/$GCC_VERSION.tar.gz
-[ -d $MPFR_VERSION ] || tar xf ../download/$MPFR_VERSION.tar.xz
-[ -d $GMP_VERSION ] || tar xf ../download/$GMP_VERSION.tar.xz
-[ -d $MPC_VERSION ] || tar xf ../download/$MPC_VERSION.tar.gz
-[ -d $ISL_VERSION ] || tar xf ../download/$ISL_VERSION.tar.bz2
-if [ "$ARCH" = "$MAIN" ]; then
-[ -d $LINUX_KERNEL_VERSION ] || tar xf ../download/$LINUX_KERNEL_VERSION.tar.xz
-[ -d $GLIBC_VERSION ] || tar xf ../download/$GLIBC_VERSION.tar.xz
-fi
-[ -d $GDB_VERSION ] || tar xf ../download/$GDB_VERSION.tar.xz
+mkdir -p $SRC_DIR
+cd $SRC_DIR
+[ -d $BINUTILS_VERSION ] || tar xf $DOWNLOAD_DIR/$BINUTILS_VERSION.tar.gz
+[ -d $GCC_VERSION ] || tar xf $DOWNLOAD_DIR/$GCC_VERSION.tar.gz
+[ -d $MPFR_VERSION ] || tar xf $DOWNLOAD_DIR/$MPFR_VERSION.tar.xz
+[ -d $GMP_VERSION ] || tar xf $DOWNLOAD_DIR/$GMP_VERSION.tar.xz
+[ -d $MPC_VERSION ] || tar xf $DOWNLOAD_DIR/$MPC_VERSION.tar.gz
+[ -d $ISL_VERSION ] || tar xf $DOWNLOAD_DIR/$ISL_VERSION.tar.bz2
+[ -d $GDB_VERSION ] || tar xf $DOWNLOAD_DIR/$GDB_VERSION.tar.xz
 
 # Make symbolic links for gcc
 cd $GCC_VERSION
@@ -76,48 +74,47 @@ ln -sf `ls -1d ../mpfr-*/` mpfr
 ln -sf `ls -1d ../gmp-*/` gmp
 ln -sf `ls -1d ../mpc-*/` mpc
 ln -sf `ls -1d ../isl-*/` isl
-cd ..
-cd ..
 
 # Binutils
-if [ ! -d build-$ARCH/binutils ]; then
-mkdir -p build-$ARCH/binutils
-cd build-$ARCH/binutils
-CFLAGS=$CFLAGS LDFLAGS=$LDFLAGS ../../src/$BINUTILS_VERSION/configure \
-    --prefix=$INSTALL_PATH \
+if [ ! -d $BUILD_DIR/binutils ]; then
+mkdir -p $BUILD_DIR/binutils
+cd $BUILD_DIR/binutils
+CFLAGS=$CFLAGS LDFLAGS=$LDFLAGS $SRC_DIR/$BINUTILS_VERSION/configure \
+    --prefix=$INSTALL_DIR \
     --build=$BUILD \
     --host=$HOST \
     --target=$TARGET
 make $PARALLEL_MAKE
 make install
-cd ../..
 fi
 
 # C/C++ Compilers
-if [ ! -d build-$ARCH/gcc ]; then
-mkdir -p build-$ARCH/gcc
-cd build-$ARCH/gcc
-CXXFLAGS=$CFLAGS CFLAGS=$CFLAGS LDFLAGS=$LDFLAGS ../../src/$GCC_VERSION/configure \
-    --prefix=$INSTALL_PATH \
+if [ ! -d $BUILD_DIR/gcc ]; then
+mkdir -p $BUILD_DIR/gcc
+cd $BUILD_DIR/gcc
+CXXFLAGS=$CFLAGS CFLAGS=$CFLAGS LDFLAGS=$LDFLAGS $SRC_DIR/$GCC_VERSION/configure \
+    --prefix=$INSTALL_DIR \
     --build=$BUILD \
     --host=$HOST \
     --target=$TARGET \
     --enable-languages=c,c++
 make $PARALLEL_MAKE all-gcc
 make install-gcc
-cd ../..
 fi
 
 # gdb
-if [ ! -d build-$ARCH/gdb ]; then
-mkdir -p build-$ARCH/gdb
-cd build-$ARCH/gdb
-CXXFLAGS=$CFLAGS CFLAGS=$CFLAGS LDFLAGS=$LDFLAGS ../../src/$GDB_VERSION/configure \
-    --prefix=$INSTALL_PATH \
+if [ ! -d $BUILD_DIR/gdb ]; then
+mkdir -p $BUILD_DIR/gdb
+cd $BUILD_DIR/gdb
+CXXFLAGS=$CFLAGS CFLAGS=$CFLAGS LDFLAGS=$LDFLAGS $SRC_DIR/$GDB_VERSION/configure \
+    --prefix=$INSTALL_DIR \
     --build=$BUILD \
     --host=$HOST \
     --target=$TARGET
 make $PARALLEL_MAKE
 make install
-cd ../..
 fi
+
+mkdir -p $TAR_DIR
+cd $INSTALL_DIR/..
+tar jcf $TAR_DIR/$TARGET-$ARCH.tar.bz2 $TARGET
